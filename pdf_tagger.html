@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Document Classifier</title>
+    <!-- Use Tailwind CSS for a clean, responsive design -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #e5e7eb;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: #9ca3af;
+            border-radius: 4px;
+        }
+        .message-box {
+            position: fixed;
+            top: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            padding: 1rem 2rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease-in-out;
+            opacity: 0;
+            visibility: hidden;
+        }
+        .message-box.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="flex flex-col h-screen overflow-hidden">
+        <!-- Header -->
+        <header class="bg-white p-4 shadow-md flex items-center justify-between">
+            <div class="flex items-center">
+                <h1 class="text-xl md:text-2xl font-bold text-gray-800">PDF Document Classifier</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div id="page-info" class="text-sm md:text-base font-semibold text-gray-600">
+                    Page: <span id="current-page-display">1</span> / <span id="total-pages-display">?</span>
+                </div>
+                <button id="export-button" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-blue-700 transition-colors duration-200 focus:outline-none">
+                    Export All <span id="export-spinner" class="spinner hidden"></span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content Area with three columns -->
+        <main class="flex-1 flex overflow-hidden">
+            <!-- Left Sidebar for Instructions -->
+            <aside class="w-full md:w-1/3 lg:w-1/4 p-4 bg-white border-r border-gray-200 shadow-inner overflow-y-auto flex flex-col">
+                <div class="flex-shrink-0">
+                    <h2 class="text-lg font-bold mb-2">Instructions</h2>
+                    <div class="text-sm text-gray-700 space-y-4">
+                        <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                            <h3 class="font-bold mb-2">Document & Page Navigation</h3>
+                            <ul class="list-disc list-inside space-y-1">
+                                <li>Use <kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">←</kbd> and <kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">→</kbd> to navigate pages.</li>
+                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">N</kbd>: New document starts (and is tagged as Hebrew)</li>
+                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">L</kbd>: Continue previous document (removes "new document" tag)</li>
+                            </ul>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                            <h3 class="font-bold mb-2">Content Tags (Mutually Exclusive)</h3>
+                            <ul class="list-disc list-inside space-y-1">
+                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">H</kbd>: Hebrew</li>
+                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">P</kbd>: Hebrew paper</li>
+                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">I</kbd>: Image</li>
+                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">O</kbd>: Other Language</li>
+                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">A</kbd>: Non-Hebrew paper</li>
+                            </ul>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                            <h3 class="font-bold mb-2">Special Tags & Actions</h3>
+                            <ul class="list-disc list-inside space-y-1">
+                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">R</kbd>: Redundant (no auto-tag)</li>
+                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">T</kbd>: Rotate page 90 degrees</li>
+                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">C</kbd>: Clear all tags and rotation</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- PDF Viewer and Controls (Center) -->
+            <div class="flex-1 p-4 flex flex-col items-center overflow-hidden relative">
+                <div class="relative w-full h-full flex items-center justify-center overflow-auto rounded-xl bg-gray-200 shadow-inner">
+                    <canvas id="pdf-canvas" class="bg-white shadow-xl rounded-lg max-w-full h-auto"></canvas>
+                    <div id="loading-indicator" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-lg text-gray-500 font-medium hidden">Loading PDF...</div>
+                </div>
+                <div class="mt-4 text-center">
+                    <span id="current-page-tag" class="text-lg font-bold text-blue-600">No tag assigned</span>
+                </div>
+            </div>
+
+            <!-- Right Sidebar for controls and history -->
+            <aside class="w-full md:w-1/3 lg:w-1/4 p-4 bg-white border-l border-gray-200 shadow-inner overflow-y-auto flex flex-col">
+                <div id="file-input-section" class="mb-6 pb-4 border-b border-gray-200">
+                    <h2 class="text-lg font-bold mb-2">Load PDF</h2>
+                    <p class="text-sm text-gray-600 mb-2">Select a PDF file from your computer to begin.</p>
+                    <input type="file" id="pdf-file-input" accept=".pdf" class="w-full p-2 border border-gray-300 rounded-lg">
+                </div>
+                
+                <div id="page-jump-section" class="mb-6 pb-4 border-b border-gray-200">
+                    <h2 class="text-lg font-bold mb-2">Go to Page</h2>
+                    <p class="text-sm text-gray-600 mb-2">Enter a page number and press enter.</p>
+                    <input type="number" id="page-jump-input" min="1" class="w-full p-2 border border-gray-300 rounded-lg text-center" placeholder="Page #">
+                </div>
+
+                <div id="tag-input-section" class="mb-6 pb-4 border-b border-gray-200">
+                    <h2 class="text-lg font-bold mb-2">Load Tags</h2>
+                    <p class="text-sm text-gray-600 mb-2">Select a JSON file to restore saved tags.</p>
+                    <input type="file" id="tags-file-input" accept=".json" class="w-full p-2 border border-gray-300 rounded-lg">
+                </div>
+
+                <div id="delete-page-section" class="mb-6 pb-4 border-b border-gray-200">
+                    <h2 class="text-lg font-bold mb-2">Page Actions</h2>
+                    <button id="delete-page-btn" class="w-full bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-red-700 transition-colors duration-200 focus:outline-none">
+                        Delete Current Page
+                    </button>
+                </div>
+
+                <div class="mt-6 flex-grow">
+                    <h2 class="text-lg font-bold mb-2">Page History</h2>
+                    <div id="tag-history" class="text-sm text-gray-700 space-y-2">
+                        <!-- Tag history will be populated here -->
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- Custom Message Box -->
+    <div id="message-box" class="message-box bg-red-500 text-white"></div>
+
+    <!-- PDF.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <!-- pdf-lib library for creating and modifying PDFs -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script defer>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+        // --- Global Variables and DOM Elements ---
+        const LOCAL_STORAGE_KEY = 'pdfTaggerTags';
+        let pdfDoc = null;
+        let pdfBytes = null; // Store the original PDF bytes for pdf-lib
+        let currentPage = 1;
+        let pageTags = {}; // Stores all page classifications as objects {tags: [], rotation: 0}
+        let lastManualTag = null; // New state variable for auto-tagging
+        let pdfFilename = 'pdf_classifications'; // Default filename for export
+        const canvas = document.getElementById('pdf-canvas');
+        const ctx = canvas.getContext('2d');
+        const currentPageDisplay = document.getElementById('current-page-display');
+        const totalPagesDisplay = document.getElementById('total-pages-display');
+        const currentPageTagDisplay = document.getElementById('current-page-tag');
+        const tagHistoryContainer = document.getElementById('tag-history');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const pdfFileInput = document.getElementById('pdf-file-input');
+        const tagsFileInput = document.getElementById('tags-file-input');
+        const exportButton = document.getElementById('export-button');
+        const deletePageBtn = document.getElementById('delete-page-btn');
+        const messageBox = document.getElementById('message-box');
+        const pageJumpInput = document.getElementById('page-jump-input');
+        const contentTags = ['hebrew', 'hebrew paper', 'image', 'other language', 'non-hebrew paper'];
+
+        // --- Functions ---
+        /**
+         * Initializes a new page entry in pageTags with a default structure.
+         * @param {number} pageNum
+         */
+        function initializePageTags(pageNum) {
+            if (!pageTags[pageNum]) {
+                pageTags[pageNum] = {
+                    tags: [],
+                    rotation: 0
+                };
+            }
+        }
+
+        /**
+         * Renders a specific page of the PDF to the canvas.
+         * @param {number} pageNum - The page number to render.
+         */
+        async function renderPage(pageNum) {
+            if (pdfDoc === null) return;
+            loadingIndicator.style.display = 'block';
+
+            try {
+                if (pageNum < 1 || pageNum > pdfDoc.numPages) {
+                    showMessage('Invalid page number.', 'error');
+                    return;
+                }
+                currentPage = pageNum;
+                initializePageTags(currentPage);
+                const rotation = pageTags[currentPage].rotation;
+                const page = await pdfDoc.getPage(currentPage);
+                
+                // Calculate the optimal scale to fit the page to the container
+                const viewportAt1 = page.getViewport({ scale: 1, rotation });
+                const containerWidth = canvas.parentNode.clientWidth;
+                const containerHeight = canvas.parentNode.clientHeight;
+                const scale = Math.min(containerWidth / viewportAt1.width, containerHeight / viewportAt1.height);
+
+                const viewport = page.getViewport({ scale, rotation });
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                const renderContext = { canvasContext: ctx, viewport };
+                await page.render(renderContext).promise;
+
+                // Update UI elements
+                currentPageDisplay.textContent = currentPage;
+                const currentTags = pageTags[currentPage].tags;
+                const rotationTag = rotation === 0 ? '' : ` (Rotated ${rotation}°)`;
+                currentPageTagDisplay.textContent = (currentTags.length > 0)
+                    ? currentTags.join(', ') + rotationTag
+                    : 'No tag assigned' + rotationTag;
+
+            } catch (error) {
+                console.error('Error rendering page:', error);
+                showMessage('Failed to render page. Please try again.');
+            } finally {
+                loadingIndicator.style.display = 'none';
+            }
+        }
+
+        /**
+         * Loads and displays a PDF from a given URL or file object.
+         * @param {string|File} source - The URL or File object of the PDF.
+         */
+        async function loadPDF(source) {
+            loadingIndicator.style.display = 'block';
+            currentPage = 1;
+            lastManualTag = null;
+            tagHistoryContainer.innerHTML = '';
+            currentPageTagDisplay.textContent = 'No tag assigned';
+            localStorage.removeItem(LOCAL_STORAGE_KEY);
+            pageTags = {};
+
+            try {
+                let pdfData;
+                if (typeof source === 'string') {
+                    // Load from URL
+                    pdfData = await fetch(source).then(res => res.arrayBuffer());
+                } else if (source instanceof File) {
+                    // Load from File object
+                    pdfData = await source.arrayBuffer();
+                }
+
+                pdfBytes = pdfData;
+                pdfDoc = await pdfjsLib.getDocument({ data: pdfData }).promise;
+                totalPagesDisplay.textContent = pdfDoc.numPages;
+
+                await renderPage(currentPage);
+            } catch (error) {
+                console.error('Error loading PDF:', error);
+                showMessage('Failed to load PDF. Please ensure it is a valid PDF file.');
+            } finally {
+                loadingIndicator.style.display = 'none';
+            }
+        }
+
+        /**
+         * Updates the UI with the selected tag for the current page.
+         * @param {string} tag - The tag to apply.
+         * @param {boolean} isCarrying - Whether this tag should be carried over.
+         */
+        function updateTag(tag, isCarrying) {
+            initializePageTags(currentPage);
+            
+            // If the new tag is a content tag, clear any existing content tags
+            // This is how 'mutually exclusive' tags are handled.
+            if (contentTags.includes(tag)) {
+                pageTags[currentPage].tags = pageTags[currentPage].tags.filter(existingTag => !contentTags.includes(existingTag));
+            }
+
+            if (!pageTags[currentPage].tags.includes(tag)) {
+                pageTags[currentPage].tags.push(tag);
+            }
+            
+            // This part handles the auto-tagging for the next page
+            if (isCarrying) {
+                lastManualTag = tag;
+            } else {
+                // 'redundant' does not change auto-tagging. 'rotated' is now a function, not a tag.
+                if (tag !== 'redundant') {
+                    lastManualTag = null;
+                }
+            }
+            
+            saveTagsToLocalStorage();
+            updateTagHistory();
+            renderPage(currentPage); // Re-render to clear the canvas
+        }
+
+        /**
+         * Saves the current page tags to local storage.
+         */
+        function saveTagsToLocalStorage() {
+            try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(pageTags));
+            } catch (e) {
+                console.error('Error saving to local storage:', e);
+                showMessage('Could not save progress. Browser storage limit reached.');
+            }
+        }
+
+        /**
+         * Updates the display of recently tagged pages.
+         */
+        function updateTagHistory() {
+            tagHistoryContainer.innerHTML = '';
+            const historyLimit = 10;
+            const pages = Object.keys(pageTags).map(Number).sort((a, b) => b - a);
+            const historyPages = pages.slice(0, historyLimit);
+
+            historyPages.forEach(page => {
+                const tags = pageTags[page].tags;
+                const rotation = pageTags[page].rotation;
+                const rotationText = rotation === 0 ? '' : ` (Rotated ${rotation}°)`;
+                const historyItem = document.createElement('div');
+                historyItem.className = 'flex justify-between items-center bg-gray-100 p-2 rounded-lg';
+                historyItem.innerHTML = `<span class="font-semibold text-gray-700">Page ${page}:</span> <span class="text-blue-600 font-medium">${tags.join(', ')}${rotationText}</span>`;
+                tagHistoryContainer.appendChild(historyItem);
+            });
+        }
+        
+        /**
+         * Shows a temporary message box.
+         * @param {string} message - The message to display.
+         * @param {string} type - The type of message (e.g., 'error', 'success').
+         */
+        function showMessage(message, type = 'error') {
+            messageBox.textContent = message;
+            messageBox.className = `message-box show ${type === 'error' ? 'bg-red-500' : 'bg-green-500'} text-white`;
+            setTimeout(() => {
+                messageBox.classList.remove('show');
+            }, 3000);
+        }
+        
+        /**
+         * Deletes the currently viewed page from the PDF document.
+         */
+        async function deleteCurrentPage() {
+            if (pdfDoc === null || pdfDoc.numPages <= 1) {
+                showMessage('Cannot delete the only page in the document.', 'error');
+                return;
+            }
+
+            loadingIndicator.style.display = 'block';
+            deletePageBtn.disabled = true;
+
+            try {
+                const { PDFDocument } = window.PDFLib;
+                const existingPdfDoc = await PDFDocument.load(pdfBytes);
+                const pageIndexToDelete = currentPage - 1;
+                existingPdfDoc.removePage(pageIndexToDelete);
+
+                // Re-save the PDF bytes with the page removed
+                const modifiedPdfBytes = await existingPdfDoc.save();
+                pdfBytes = modifiedPdfBytes;
+
+                // Reload the pdf.js document
+                pdfDoc = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
+                
+                // --- CRITICAL STEP: Update and shift the page tags after deletion ---
+                const newPageTags = {};
+                for (let i = 1; i <= pdfDoc.numPages; i++) {
+                    const oldPageNum = i > pageIndexToDelete ? i + 1 : i;
+                    if (pageTags[oldPageNum]) {
+                        newPageTags[i] = pageTags[oldPageNum];
+                    }
+                }
+                pageTags = newPageTags;
+                // --- END CRITICAL STEP ---
+
+                saveTagsToLocalStorage();
+
+                // Navigate to the correct page after deletion
+                if (currentPage > pdfDoc.numPages) {
+                    currentPage = pdfDoc.numPages;
+                }
+
+                showMessage(`Page ${pageIndexToDelete + 1} deleted successfully.`, 'success');
+                await renderPage(currentPage);
+                totalPagesDisplay.textContent = pdfDoc.numPages;
+                updateTagHistory();
+
+            } catch (error) {
+                console.error('Error deleting page:', error);
+                showMessage('Failed to delete page. Check console for details.', 'error');
+            } finally {
+                loadingIndicator.style.display = 'none';
+                deletePageBtn.disabled = false;
+            }
+        }
+        
+        /**
+         * Creates and downloads a new PDF with rotations applied and redundant pages removed.
+         */
+        async function exportRotatedAndCleanPdf() {
+            if (!pdfBytes) {
+                showMessage('No PDF loaded to export.');
+                return;
+            }
+
+            try {
+                const { PDFDocument, degrees } = window.PDFLib;
+                if (!PDFDocument) {
+                    throw new Error('PDF-lib library not loaded.');
+                }
+                
+                const originalPdf = await PDFDocument.load(pdfBytes);
+                const newPdf = await PDFDocument.create();
+
+                const originalPageIndices = Array.from({ length: originalPdf.getPageCount() }, (_, i) => i);
+                
+                for (let i = 0; i < originalPageIndices.length; i++) {
+                    const pageNum = i + 1;
+                    initializePageTags(pageNum);
+
+                    // Check if the page is redundant
+                    if (pageTags[pageNum].tags.includes('redundant')) {
+                        continue; // Skip this page
+                    }
+
+                    const [page] = await newPdf.copyPages(originalPdf, [i]);
+                    const rotation = pageTags[pageNum].rotation;
+                    
+                    if (rotation !== 0) {
+                        page.setRotation(degrees(rotation));
+                    }
+                    
+                    newPdf.addPage(page);
+                }
+
+                const modifiedPdfBytes = await newPdf.save();
+                
+                const blob = new Blob([modifiedPdfBytes], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${pdfFilename}_clean.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                
+            } catch (error) {
+                console.error('Error exporting PDF:', error);
+                throw new Error('Failed to export PDF.');
+            }
+        }
+
+        /**
+         * Creates and downloads a new JSON file with re-indexed tags.
+         */
+        function exportCleanTagsJson() {
+            if (Object.keys(pageTags).length === 0) {
+                showMessage('No pages have been tagged yet.');
+                return;
+            }
+
+            const cleanTags = {};
+            let newPageNumber = 1;
+            
+            // Iterate through original pages
+            for (let i = 1; i <= pdfDoc.numPages; i++) {
+                const pageData = pageTags[i];
+                if (pageData && !pageData.tags.includes('redundant')) {
+                    // Create a clean copy
+                    const cleanedPageData = {
+                        tags: [...pageData.tags],
+                        rotation: pageData.rotation
+                    };
+                    
+                    cleanTags[newPageNumber] = cleanedPageData;
+                    newPageNumber++;
+                }
+            }
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(cleanTags, null, 2));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", `${pdfFilename}_clean.json`);
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        /**
+         * Handles the combined export of both the clean PDF and the JSON tags.
+         */
+        async function handleCombinedExport() {
+            // Show spinner and disable button
+            exportButton.disabled = true;
+            exportButton.classList.add('bg-blue-400');
+            exportButton.innerHTML = 'Exporting... <span class="spinner"></span>';
+
+            try {
+                // Export the JSON file first
+                exportCleanTagsJson();
+                
+                // Then, export the PDF
+                await exportRotatedAndCleanPdf();
+
+                showMessage('Export complete. Both PDF and tags JSON have been downloaded.', 'success');
+            } catch (error) {
+                console.error('Combined export failed:', error);
+                showMessage('Export failed. Please try again.', 'error');
+            } finally {
+                // Hide spinner and re-enable button
+                exportButton.disabled = false;
+                exportButton.classList.remove('bg-blue-400');
+                exportButton.innerHTML = 'Export All <span class="spinner hidden"></span>';
+            }
+        }
+
+        // --- Event Listeners ---
+        document.addEventListener('keydown', (e) => {
+            if (pdfDoc === null) return;
+
+            const key = e.key.toLowerCase();
+            switch (key) {
+                case 'arrowleft':
+                    if (currentPage > 1) {
+                        currentPage--;
+                        renderPage(currentPage);
+                    }
+                    break;
+                case 'arrowright':
+                    if (currentPage < pdfDoc.numPages) {
+                        currentPage++;
+                        // Only apply auto-tag if the page doesn't have any tags yet
+                        if (lastManualTag && (!pageTags[currentPage] || pageTags[currentPage].tags.length === 0)) {
+                            initializePageTags(currentPage);
+                            pageTags[currentPage].tags.push(lastManualTag);
+                            saveTagsToLocalStorage();
+                        }
+                        renderPage(currentPage);
+                    }
+                    break;
+                case 'h':
+                    updateTag('hebrew', true);
+                    break;
+                case 'p':
+                    updateTag('hebrew paper', true);
+                    break;
+                case 'i':
+                    updateTag('image', true);
+                    break;
+                case 'o':
+                    updateTag('other language', true);
+                    break;
+                case 'a':
+                    updateTag('non-hebrew paper', true);
+                    break;
+                case 'n':
+                    // Tag current page with 'new document starts' and 'hebrew'
+                    initializePageTags(currentPage);
+                    pageTags[currentPage].tags = ['new document starts', 'hebrew'];
+                    lastManualTag = 'hebrew';
+                    saveTagsToLocalStorage();
+                    updateTagHistory();
+                    renderPage(currentPage);
+                    break;
+                case 'r':
+                    // Special case for 'redundant':
+                    // 1. Clear any existing content tags on the page.
+                    // 2. Add 'redundant' tag.
+                    // 3. Do NOT change lastManualTag so auto-tagging continues.
+                    initializePageTags(currentPage);
+                    pageTags[currentPage].tags = ['redundant'];
+                    lastManualTag = null;
+                    saveTagsToLocalStorage();
+                    updateTagHistory();
+                    renderPage(currentPage);
+                    break;
+                case 't':
+                    // Rotate the current page 90 degrees clockwise
+                    initializePageTags(currentPage);
+                    pageTags[currentPage].rotation = (pageTags[currentPage].rotation + 90) % 360;
+                    saveTagsToLocalStorage();
+                    updateTagHistory();
+                    renderPage(currentPage);
+                    showMessage('Page rotated 90 degrees.', 'success');
+                    break;
+                case 'c':
+                    // Clear all tags and rotation from the current page
+                    pageTags[currentPage] = { tags: [], rotation: 0 };
+                    lastManualTag = null;
+                    saveTagsToLocalStorage();
+                    renderPage(currentPage);
+                    showMessage('Tags and rotation cleared from this page.', 'success');
+                    break;
+                case 'l':
+                    // Continue previous document
+                    if (currentPage > 1 && pageTags[currentPage]) {
+                        const newDocTagIndex = pageTags[currentPage].tags.indexOf('new document starts');
+                        if (newDocTagIndex !== -1) {
+                            pageTags[currentPage].tags.splice(newDocTagIndex, 1);
+                        }
+                        // Set auto-tagging to the last tag of the previous page
+                        const prevPageTags = pageTags[currentPage - 1];
+                        if (prevPageTags && prevPageTags.tags.length > 0) {
+                            lastManualTag = prevPageTags.tags[prevPageTags.tags.length - 1];
+                        } else {
+                            lastManualTag = null;
+                        }
+                        saveTagsToLocalStorage();
+                        renderPage(currentPage);
+                        showMessage('Continuing previous document.', 'success');
+                    } else {
+                        showMessage('Cannot continue previous document. No tags on previous page or this is the first page.', 'error');
+                    }
+                    break;
+            }
+        });
+        
+        // Handle page jump input
+        pageJumpInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const pageNum = parseInt(pageJumpInput.value, 10);
+                if (pdfDoc && pageNum >= 1 && pageNum <= pdfDoc.numPages) {
+                    renderPage(pageNum);
+                    pageJumpInput.value = ''; // Clear input after jump
+                } else {
+                    showMessage('Please enter a valid page number.', 'error');
+                }
+            }
+        });
+
+        // Handle export button click
+        exportButton.addEventListener('click', handleCombinedExport);
+
+        // Handle delete page button click
+        deletePageBtn.addEventListener('click', deleteCurrentPage);
+
+        pdfFileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                pdfFilename = file.name.replace(/\.pdf$/, '');
+                loadPDF(file);
+            }
+        });
+
+        tagsFileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        // Ensure loaded tags have the new structure
+                        const loadedTags = JSON.parse(e.target.result);
+                        for (const page in loadedTags) {
+                            if (Array.isArray(loadedTags[page])) {
+                                // Convert old format to new format
+                                loadedTags[page] = { tags: loadedTags[page], rotation: 0 };
+                            } else if (typeof loadedTags[page] !== 'object' || !Array.isArray(loadedTags[page].tags)) {
+                                console.warn('Invalid page data format, skipping:', loadedTags[page]);
+                                delete loadedTags[page];
+                            }
+                        }
+                        pageTags = loadedTags;
+                        updateTagHistory();
+                        renderPage(currentPage);
+                        showMessage('Tags loaded successfully from file!', 'success');
+                    } catch (error) {
+                        console.error('Error parsing JSON file:', error);
+                        showMessage('Failed to load tags. Invalid JSON format.', 'error');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // Load a sample PDF on page load to confirm functionality
+        window.onload = function() {
+            // New, reliable URL for a sample PDF.
+            const defaultPdfUrl = 'https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf';
+            loadPDF(defaultPdfUrl);
+        };
+    </script>
+
+</body>
+</html>
