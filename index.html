@@ -53,6 +53,22 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        #pdf-canvas {
+            touch-action: none; /* Disables default touch actions like double-tap zoom */
+            cursor: grab;
+        }
+        #pdf-viewer-container.no-pdf {
+            background-color: #f3f4f6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #9ca3af;
+            font-size: 1.5rem;
+            font-weight: 500;
+            user-select: none;
+            cursor: default;
+        }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
@@ -65,7 +81,7 @@
             </div>
             <div class="flex items-center space-x-2 sm:space-x-4">
                 <div id="page-info" class="text-xs sm:text-sm md:text-base font-semibold text-gray-600">
-                    Page: <span id="current-page-display">1</span> / <span id="total-pages-display">?</span>
+                    Page: <span id="current-page-display">?</span> / <span id="total-pages-display">?</span>
                 </div>
                 <button id="export-button" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-blue-700 transition-colors duration-200 focus:outline-none text-sm">
                     Export All <span id="export-spinner" class="spinner hidden"></span>
@@ -81,30 +97,40 @@
                     <h2 class="text-lg font-bold mb-2">Instructions</h2>
                     <div class="text-sm text-gray-700 space-y-4">
                         <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                            <h3 class="font-bold mb-2">Document & Page Navigation</h3>
+                            <h3 class="font-bold mb-2">Page Navigation</h3>
                             <ul class="list-disc list-inside space-y-1">
                                 <li>Use <kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">←</kbd> and <kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">→</kbd> to navigate pages.</li>
-                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">N</kbd>: New document starts (and is tagged as Hebrew)</li>
-                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">L</kbd>: Continue previous document (removes "new document" tag)</li>
+                            </ul>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                            <h3 class="font-bold mb-2">Document Tagging</h3>
+                            <ul class="list-disc list-inside space-y-1">
+                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">N</kbd>: New document starts</li>
+                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">L</kbd>: Continue previous document</li>
                             </ul>
                         </div>
                         <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
                             <h3 class="font-bold mb-2">Content Tags (Mutually Exclusive)</h3>
                             <ul class="list-disc list-inside space-y-1">
                                 <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">H</kbd>: Hebrew</li>
-                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">P</kbd>: Hebrew paper</li>
+                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">P</kbd>: Hebrew paper clippings</li>
                                 <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">I</kbd>: Image</li>
                                 <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">O</kbd>: Other Language</li>
-                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">A</kbd>: Non-Hebrew paper</li>
+                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">A</kbd>: Non-Hebrew paper clippings</li>
                             </ul>
                         </div>
                         <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
                             <h3 class="font-bold mb-2">Special Tags & Actions</h3>
                             <ul class="list-disc list-inside space-y-1">
-                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">R</kbd>: Redundant (no auto-tag)</li>
+                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">R</kbd>: Redundant page</li>
                                 <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">T</kbd>: Rotate page 90 degrees</li>
-                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">C</kbd>: Clear all tags and rotation</li>
+                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">C</kbd>: Clear all tags</li>
                             </ul>
+                        </div>
+                        <div id="page-jump-section" class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                            <h3 class="font-bold mb-2">Go to Page</h3>
+                            <p class="text-sm text-gray-600 mb-2">Enter a page number and press enter.</p>
+                            <input type="number" id="page-jump-input" min="1" class="w-full p-2 border border-gray-300 rounded-lg text-center text-sm" placeholder="Page #">
                         </div>
                     </div>
                 </div>
@@ -112,9 +138,12 @@
 
             <!-- PDF Viewer and Controls (Center) -->
             <div class="flex-1 p-2 sm:p-4 flex flex-col items-center overflow-hidden relative order-2 md:order-2">
-                <div class="relative w-full h-full flex items-center justify-center overflow-auto rounded-xl bg-gray-200 shadow-inner">
+                <div id="pdf-viewer-container" class="relative w-full h-full flex items-center justify-center overflow-auto rounded-xl bg-gray-200 shadow-inner no-pdf">
                     <canvas id="pdf-canvas" class="bg-white shadow-xl rounded-lg max-w-full h-auto"></canvas>
                     <div id="loading-indicator" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-lg text-gray-500 font-medium hidden">Loading PDF...</div>
+                    <div id="empty-message" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                        Please select a PDF file to begin.
+                    </div>
                 </div>
                 <div class="mt-2 sm:mt-4 text-center">
                     <span id="current-page-tag" class="text-sm sm:text-base font-bold text-blue-600">No tag assigned</span>
@@ -129,23 +158,11 @@
                     <input type="file" id="pdf-file-input" accept=".pdf" class="w-full p-2 border border-gray-300 rounded-lg text-sm">
                 </div>
                 
-                <div id="page-jump-section" class="mb-4 pb-4 border-b border-gray-200">
-                    <h2 class="text-lg font-bold mb-2">Go to Page</h2>
-                    <p class="text-sm text-gray-600 mb-2">Enter a page number and press enter.</p>
-                    <input type="number" id="page-jump-input" min="1" class="w-full p-2 border border-gray-300 rounded-lg text-center text-sm" placeholder="Page #">
-                </div>
-
+                
                 <div id="tag-input-section" class="mb-4 pb-4 border-b border-gray-200">
                     <h2 class="text-lg font-bold mb-2">Load Tags</h2>
                     <p class="text-sm text-gray-600 mb-2">Select a JSON file to restore saved tags.</p>
                     <input type="file" id="tags-file-input" accept=".json" class="w-full p-2 border border-gray-300 rounded-lg text-sm">
-                </div>
-
-                <div id="delete-page-section" class="mb-4 pb-4 border-b border-gray-200">
-                    <h2 class="text-lg font-bold mb-2">Page Actions</h2>
-                    <button id="delete-page-btn" class="w-full bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-red-700 transition-colors duration-200 focus:outline-none text-sm">
-                        Delete Current Page
-                    </button>
                 </div>
 
                 <div class="mt-4 flex-grow">
@@ -176,6 +193,16 @@
         let pageTags = {}; // Stores all page classifications as objects {tags: [], rotation: 0}
         let lastManualTag = null; // New state variable for auto-tagging
         let pdfFilename = 'pdf_classifications'; // Default filename for export
+
+        // Zoom and Pan variables
+        let currentScale = 1.0;
+        const scaleFactor = 1.1; // Zoom multiplier
+        let isDragging = false;
+        let lastX = 0;
+        let lastY = 0;
+        let translateX = 0;
+        let translateY = 0;
+
         const canvas = document.getElementById('pdf-canvas');
         const ctx = canvas.getContext('2d');
         const currentPageDisplay = document.getElementById('current-page-display');
@@ -186,10 +213,12 @@
         const pdfFileInput = document.getElementById('pdf-file-input');
         const tagsFileInput = document.getElementById('tags-file-input');
         const exportButton = document.getElementById('export-button');
-        const deletePageBtn = document.getElementById('delete-page-btn');
         const messageBox = document.getElementById('message-box');
         const pageJumpInput = document.getElementById('page-jump-input');
-        const contentTags = ['hebrew', 'hebrew paper', 'image', 'other language', 'non-hebrew paper'];
+        const pdfViewerContainer = document.getElementById('pdf-viewer-container');
+        const emptyMessage = document.getElementById('empty-message');
+
+        const contentTags = ['hebrew', 'hebrew paper clippings', 'image', 'other language', 'non-hebrew paper clippings'];
 
         // --- Functions ---
         /**
@@ -223,18 +252,25 @@
                 const rotation = pageTags[currentPage].rotation;
                 const page = await pdfDoc.getPage(currentPage);
                 
-                // Calculate the optimal scale to fit the page to the container
-                const viewportAt1 = page.getViewport({ scale: 1, rotation });
-                const containerWidth = canvas.parentNode.clientWidth;
-                const containerHeight = canvas.parentNode.clientHeight;
-                const scale = Math.min(containerWidth / viewportAt1.width, containerHeight / viewportAt1.height);
-
-                const viewport = page.getViewport({ scale, rotation });
+                // If not zoomed, calculate the optimal scale to fit the page to the container
+                if (currentScale === 1.0) {
+                    const viewportAt1 = page.getViewport({ scale: 1, rotation });
+                    const containerWidth = pdfViewerContainer.clientWidth;
+                    const containerHeight = pdfViewerContainer.clientHeight;
+                    const fitScale = Math.min(containerWidth / viewportAt1.width, containerHeight / viewportAt1.height);
+                    currentScale = fitScale;
+                }
+                
+                // Create viewport with current zoom and rotation
+                const viewport = page.getViewport({ scale: currentScale, rotation });
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
                 const renderContext = { canvasContext: ctx, viewport };
                 await page.render(renderContext).promise;
 
+                // Update canvas transform for panning
+                canvas.style.transform = `translate(${translateX}px, ${translateY}px)`;
+                
                 // Update UI elements
                 currentPageDisplay.textContent = currentPage;
                 const currentTags = pageTags[currentPage].tags;
@@ -257,21 +293,24 @@
          */
         async function loadPDF(source) {
             loadingIndicator.style.display = 'block';
+            emptyMessage.style.display = 'none';
+            pdfViewerContainer.classList.remove('no-pdf');
             currentPage = 1;
             lastManualTag = null;
             tagHistoryContainer.innerHTML = '';
             currentPageTagDisplay.textContent = 'No tag assigned';
             localStorage.removeItem(LOCAL_STORAGE_KEY);
             pageTags = {};
+            currentScale = 1.0; // Reset zoom
+            translateX = 0;
+            translateY = 0;
 
             try {
                 let pdfData;
-                if (typeof source === 'string') {
-                    // Load from URL
-                    pdfData = await fetch(source).then(res => res.arrayBuffer());
-                } else if (source instanceof File) {
-                    // Load from File object
+                if (source instanceof File) {
                     pdfData = await source.arrayBuffer();
+                } else {
+                    throw new Error("Invalid file type.");
                 }
 
                 pdfBytes = pdfData;
@@ -282,6 +321,8 @@
             } catch (error) {
                 console.error('Error loading PDF:', error);
                 showMessage('Failed to load PDF. Please ensure it is a valid PDF file.');
+                emptyMessage.style.display = 'block';
+                pdfViewerContainer.classList.add('no-pdf');
             } finally {
                 loadingIndicator.style.display = 'none';
             }
@@ -363,63 +404,6 @@
             setTimeout(() => {
                 messageBox.classList.remove('show');
             }, 3000);
-        }
-        
-        /**
-         * Deletes the currently viewed page from the PDF document.
-         */
-        async function deleteCurrentPage() {
-            if (pdfDoc === null || pdfDoc.numPages <= 1) {
-                showMessage('Cannot delete the only page in the document.', 'error');
-                return;
-            }
-
-            loadingIndicator.style.display = 'block';
-            deletePageBtn.disabled = true;
-
-            try {
-                const { PDFDocument } = window.PDFLib;
-                const existingPdfDoc = await PDFDocument.load(pdfBytes);
-                const pageIndexToDelete = currentPage - 1;
-                existingPdfDoc.removePage(pageIndexToDelete);
-
-                // Re-save the PDF bytes with the page removed
-                const modifiedPdfBytes = await existingPdfDoc.save();
-                pdfBytes = modifiedPdfBytes;
-
-                // Reload the pdf.js document
-                pdfDoc = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
-                
-                // --- CRITICAL STEP: Update and shift the page tags after deletion ---
-                const newPageTags = {};
-                for (let i = 1; i <= pdfDoc.numPages; i++) {
-                    const oldPageNum = i > pageIndexToDelete ? i + 1 : i;
-                    if (pageTags[oldPageNum]) {
-                        newPageTags[i] = pageTags[oldPageNum];
-                    }
-                }
-                pageTags = newPageTags;
-                // --- END CRITICAL STEP ---
-
-                saveTagsToLocalStorage();
-
-                // Navigate to the correct page after deletion
-                if (currentPage > pdfDoc.numPages) {
-                    currentPage = pdfDoc.numPages;
-                }
-
-                showMessage(`Page ${pageIndexToDelete + 1} deleted successfully.`, 'success');
-                await renderPage(currentPage);
-                totalPagesDisplay.textContent = pdfDoc.numPages;
-                updateTagHistory();
-
-            } catch (error) {
-                console.error('Error deleting page:', error);
-                showMessage('Failed to delete page. Check console for details.', 'error');
-            } finally {
-                loadingIndicator.style.display = 'none';
-                deletePageBtn.disabled = false;
-            }
         }
         
         /**
@@ -571,7 +555,7 @@
                     updateTag('hebrew', true);
                     break;
                 case 'p':
-                    updateTag('hebrew paper', true);
+                    updateTag('hebrew paper clippings', true);
                     break;
                 case 'i':
                     updateTag('image', true);
@@ -580,7 +564,7 @@
                     updateTag('other language', true);
                     break;
                 case 'a':
-                    updateTag('non-hebrew paper', true);
+                    updateTag('non-hebrew paper clippings', true);
                     break;
                 case 'n':
                     // Tag current page with 'new document starts' and 'hebrew'
@@ -613,12 +597,12 @@
                     showMessage('Page rotated 90 degrees.', 'success');
                     break;
                 case 'c':
-                    // Clear all tags and rotation from the current page
-                    pageTags[currentPage] = { tags: [], rotation: 0 };
+                    // Clear all tags from the current page but keep rotation
+                    pageTags[currentPage].tags = [];
                     lastManualTag = null;
                     saveTagsToLocalStorage();
                     renderPage(currentPage);
-                    showMessage('Tags and rotation cleared from this page.', 'success');
+                    showMessage('Tags cleared from this page.', 'success');
                     break;
                 case 'l':
                     // Continue previous document
@@ -660,9 +644,6 @@
         // Handle export button click
         exportButton.addEventListener('click', handleCombinedExport);
 
-        // Handle delete page button click
-        deletePageBtn.addEventListener('click', deleteCurrentPage);
-
         pdfFileInput.addEventListener('change', (event) => {
             const file = event.target.files[0];
             if (file) {
@@ -677,11 +658,9 @@
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     try {
-                        // Ensure loaded tags have the new structure
                         const loadedTags = JSON.parse(e.target.result);
                         for (const page in loadedTags) {
                             if (Array.isArray(loadedTags[page])) {
-                                // Convert old format to new format
                                 loadedTags[page] = { tags: loadedTags[page], rotation: 0 };
                             } else if (typeof loadedTags[page] !== 'object' || !Array.isArray(loadedTags[page].tags)) {
                                 console.warn('Invalid page data format, skipping:', loadedTags[page]);
@@ -700,7 +679,64 @@
                 reader.readAsText(file);
             }
         });
-    </script>
+        
+        // --- Zoom and Pan Event Listeners ---
+        canvas.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            if (!pdfDoc) return;
+            isDragging = true;
+            lastX = e.clientX;
+            lastY = e.clientY;
+            canvas.style.cursor = 'grabbing';
+        });
 
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDragging || !pdfDoc) return;
+            const dx = e.clientX - lastX;
+            const dy = e.clientY - lastY;
+            translateX += dx;
+            translateY += dy;
+            canvas.style.transform = `translate(${translateX}px, ${translateY}px)`;
+            lastX = e.clientX;
+            lastY = e.clientY;
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+            canvas.style.cursor = 'grab';
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            isDragging = false;
+            canvas.style.cursor = 'grab';
+        });
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            if (!pdfDoc) return;
+            
+            const oldScale = currentScale;
+            currentScale = e.deltaY > 0 ? oldScale / scaleFactor : oldScale * scaleFactor;
+
+            // Ensure scale doesn't go too small or too large
+            currentScale = Math.max(0.1, Math.min(10.0, currentScale));
+
+            // Calculate new position to zoom around the mouse cursor
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            const oldWidth = canvas.width;
+            const oldHeight = canvas.height;
+
+            const newWidth = oldWidth * (currentScale / oldScale);
+            const newHeight = oldHeight * (currentScale / oldScale);
+
+            translateX -= (mouseX / oldWidth) * (newWidth - oldWidth);
+            translateY -= (mouseY / oldHeight) * (newHeight - oldHeight);
+            
+            renderPage(currentPage);
+        });
+    </script>
 </body>
 </html>
