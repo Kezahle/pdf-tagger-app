@@ -7,32 +7,21 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        /* =============================================================================
-           CUSTOM STYLES
-           ============================================================================= */
-        
-        /* Base styles */
         body {
             font-family: 'Inter', sans-serif;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
         }
-
-        /* Custom scrollbar styling */
         ::-webkit-scrollbar {
             width: 8px;
         }
-
         ::-webkit-scrollbar-track {
             background: #e5e7eb;
         }
-
         ::-webkit-scrollbar-thumb {
             background-color: #9ca3af;
             border-radius: 4px;
         }
-
-        /* Message box styles */
         .message-box {
             position: fixed;
             top: 2rem;
@@ -46,13 +35,10 @@
             opacity: 0;
             visibility: hidden;
         }
-
         .message-box.show {
             opacity: 1;
             visibility: visible;
         }
-
-        /* Loading spinner animation */
         .spinner {
             border: 4px solid rgba(255, 255, 255, 0.3);
             border-top: 4px solid #fff;
@@ -61,19 +47,14 @@
             height: 24px;
             animation: spin 1s linear infinite;
         }
-
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-
-        /* PDF canvas styles */
         #pdf-canvas {
             touch-action: none;
             cursor: grab;
         }
-
-        /* PDF viewer container when no PDF is loaded */
         #pdf-viewer-container.no-pdf {
             background-color: #f3f4f6;
             display: flex;
@@ -86,45 +67,27 @@
             user-select: none;
             cursor: default;
         }
-
-        /* Responsive design adjustments */
-        @media (max-width: 768px) {
-            .message-box {
-                top: 1rem;
-                left: 1rem;
-                right: 1rem;
-                transform: none;
-                width: auto;
-            }
-        }
-
-        /* Keyboard shortcut styling */
-        kbd {
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            font-size: 0.75rem;
+        #current-page-input {
+            width: 3rem;
+            text-align: center;
+            border: 1px solid #d1d5db;
+            border-radius: 0.25rem;
+            padding: 0.125rem 0.25rem;
             font-weight: 600;
-            line-height: 1;
-            white-space: nowrap;
+            background: white;
         }
-
-        /* Focus states for accessibility */
-        button:focus-visible,
-        input:focus-visible {
+        #current-page-input:focus {
             outline: 2px solid #3b82f6;
-            outline-offset: 2px;
+            outline-offset: 1px;
+            border-color: #3b82f6;
         }
-
-        /* Custom button states */
-        button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
+        #current-page-input::-webkit-outer-spin-button,
+        #current-page-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
         }
-
-        /* Smooth transitions */
-        .transition-colors {
-            transition-property: color, background-color, border-color;
-            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-            transition-duration: 150ms;
+        #current-page-input {
+            -moz-appearance: textfield;
         }
     </style>
 </head>
@@ -137,7 +100,7 @@
             </div>
             <div class="flex items-center space-x-2 sm:space-x-4">
                 <div id="page-info" class="text-xs sm:text-sm md:text-base font-semibold text-gray-600">
-                    Page: <span id="current-page-display">?</span> / <span id="total-pages-display">?</span>
+                    Page: <input type="number" id="current-page-input" min="1" value="1" class="hidden" /> <span id="current-page-display">?</span> / <span id="total-pages-display">?</span>
                 </div>
                 <button id="export-button" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-blue-700 transition-colors duration-200 focus:outline-none text-sm">
                     Export All <span id="export-spinner" class="spinner hidden"></span>
@@ -150,56 +113,52 @@
             <!-- Left Sidebar for Instructions -->
             <aside class="w-full md:w-1/3 lg:w-1/4 p-4 bg-white md:border-r border-gray-200 shadow-inner overflow-y-auto flex flex-col order-1 md:order-1">
                 <div class="flex-shrink-0">
-                    <h2 class="text-lg font-bold mb-2">Instructions</h2>
-                    <div class="text-sm text-gray-700 space-y-4">
-                        <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                            <h3 class="font-bold mb-2">Page Navigation</h3>
-                            <ul class="list-disc list-inside space-y-1">
-                                <li>Use <kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">←</kbd> and <kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">→</kbd> to navigate pages.</li>
-                            </ul>
+                    <h2 class="text-lg font-bold mb-3">Instructions</h2>
+                    <div class="text-sm text-gray-700 space-y-3">
+                        <div class="bg-gray-50 p-2 rounded border border-gray-200">
+                            <h3 class="font-bold mb-1">Navigation & Documents</h3>
+                            <div class="text-xs space-y-1">
+                                <div><kbd class="px-1 py-0.5 bg-gray-200 rounded font-mono text-xs">←</kbd><kbd class="px-1 py-0.5 bg-gray-200 rounded font-mono text-xs">→</kbd> Navigate pages</div>
+                                <div><kbd class="px-1 py-0.5 bg-gray-200 rounded font-mono text-xs">N</kbd> New document starts</div>
+                                <div><kbd class="px-1 py-0.5 bg-gray-200 rounded font-mono text-xs">L</kbd> Continue previous document</div>
+                            </div>
                         </div>
-                        <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                            <h3 class="font-bold mb-2">Document Tagging</h3>
-                            <ul class="list-disc list-inside space-y-1">
-                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">N</kbd>: New document starts</li>
-                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">L</kbd>: Continue previous document</li>
-                            </ul>
+                        <div class="bg-gray-50 p-2 rounded border border-gray-200">
+                            <h3 class="font-bold mb-1">Actions</h3>
+                            <div class="text-xs space-y-1">
+                                <div><kbd class="px-1 py-0.5 bg-gray-200 rounded font-mono text-xs">Del</kbd> Mark page for deletion</div>
+                                <div><kbd class="px-1 py-0.5 bg-gray-200 rounded font-mono text-xs">T</kbd> Rotate page 90°</div>
+                                <div><kbd class="px-1 py-0.5 bg-gray-200 rounded font-mono text-xs">C</kbd> Clear all tags</div>
+                                <div><kbd class="px-1 py-0.5 bg-gray-200 rounded font-mono text-xs">Z</kbd> Reset zoom/pan</div>
+                            </div>
                         </div>
-                        <div class="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                            <h3 class="font-bold mb-2 text-blue-800">Hebrew Content</h3>
-                            <ul class="list-disc list-inside space-y-1">
-                                <li><kbd class="px-2 py-1 bg-blue-200 rounded-md font-mono text-xs">1</kbd>: Hebrew printed</li>
-                                <li><kbd class="px-2 py-1 bg-blue-200 rounded-md font-mono text-xs">2</kbd>: Hebrew paper clippings</li>
-                                <li><kbd class="px-2 py-1 bg-blue-200 rounded-md font-mono text-xs">3</kbd>: Hebrew handwritten</li>
-                            </ul>
-                        </div>
-                        <div class="bg-green-50 p-3 rounded-lg border border-green-200">
-                            <h3 class="font-bold mb-2 text-green-800">Non-Hebrew Languages</h3>
-                            <ul class="list-disc list-inside space-y-1">
-                                <li><kbd class="px-2 py-1 bg-green-200 rounded-md font-mono text-xs">4</kbd>: Non-Hebrew printed</li>
-                                <li><kbd class="px-2 py-1 bg-green-200 rounded-md font-mono text-xs">5</kbd>: Non-Hebrew paper clippings</li>
-                            </ul>
-                        </div>
-                        <div class="bg-purple-50 p-3 rounded-lg border border-purple-200">
-                            <h3 class="font-bold mb-2 text-purple-800">Other Content</h3>
-                            <ul class="list-disc list-inside space-y-1">
-                                <li><kbd class="px-2 py-1 bg-purple-200 rounded-md font-mono text-xs">6</kbd>: Image</li>
-                                <li><kbd class="px-2 py-1 bg-purple-200 rounded-md font-mono text-xs">7</kbd>: Undefined</li>
-                                <li><kbd class="px-2 py-1 bg-purple-200 rounded-md font-mono text-xs">8</kbd>: Mixed (Hebrew and Non-Hebrew)</li>
-                            </ul>
-                        </div>
-                        <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                            <h3 class="font-bold mb-2">Special Tags & Actions</h3>
-                            <ul class="list-disc list-inside space-y-1">
-                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">R</kbd>: Redundant page</li>
-                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">T</kbd>: Rotate page 90 degrees</li>
-                                <li><kbd class="px-2 py-1 bg-gray-200 rounded-md font-mono text-xs">C</kbd>: Clear all tags</li>
-                            </ul>
-                        </div>
-                        <div id="page-jump-section" class="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                            <h3 class="font-bold mb-2">Go to Page</h3>
-                            <p class="text-sm text-gray-600 mb-2">Enter a page number and press enter.</p>
-                            <input type="number" id="page-jump-input" min="1" class="w-full p-2 border border-gray-300 rounded-lg text-center text-sm" placeholder="Page #">
+                        <div class="bg-slate-50 p-3 rounded border border-slate-200">
+                            <h3 class="font-bold mb-2 text-slate-800">Content Tagging</h3>
+                            <div class="space-y-2">
+                                <div class="bg-blue-50 p-2 rounded border border-blue-200">
+                                    <h4 class="font-semibold mb-1 text-blue-800 text-xs">Hebrew Content</h4>
+                                    <div class="text-xs space-y-1">
+                                        <div><kbd class="px-1 py-0.5 bg-blue-200 rounded font-mono text-xs">H</kbd> Hebrew printed</div>
+                                        <div><kbd class="px-1 py-0.5 bg-blue-200 rounded font-mono text-xs">P</kbd> Hebrew paper clippings</div>
+                                        <div><kbd class="px-1 py-0.5 bg-blue-200 rounded font-mono text-xs">W</kbd> Hebrew handwritten</div>
+                                    </div>
+                                </div>
+                                <div class="bg-green-50 p-2 rounded border border-green-200">
+                                    <h4 class="font-semibold mb-1 text-green-800 text-xs">Non-Hebrew Languages</h4>
+                                    <div class="text-xs space-y-1">
+                                        <div><kbd class="px-1 py-0.5 bg-green-200 rounded font-mono text-xs">F</kbd> Non-Hebrew printed</div>
+                                        <div><kbd class="px-1 py-0.5 bg-green-200 rounded font-mono text-xs">G</kbd> Non-Hebrew paper clippings</div>
+                                    </div>
+                                </div>
+                                <div class="bg-purple-50 p-2 rounded border border-purple-200">
+                                    <h4 class="font-semibold mb-1 text-purple-800 text-xs">Other Content</h4>
+                                    <div class="text-xs space-y-1">
+                                        <div><kbd class="px-1 py-0.5 bg-purple-200 rounded font-mono text-xs">I</kbd> Image</div>
+                                        <div><kbd class="px-1 py-0.5 bg-purple-200 rounded font-mono text-xs">U</kbd> Undefined</div>
+                                        <div><kbd class="px-1 py-0.5 bg-purple-200 rounded font-mono text-xs">M</kbd> Mixed (Hebrew and Non-Hebrew)</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -233,9 +192,9 @@
                     <input type="file" id="tags-file-input" accept=".json" class="w-full p-2 border border-gray-300 rounded-lg text-sm">
                 </div>
 
-                <div class="mt-4 flex-grow">
+                <div class="mt-4 flex-grow flex flex-col">
                     <h2 class="text-lg font-bold mb-2">Page History</h2>
-                    <div id="tag-history" class="text-sm text-gray-700 space-y-2">
+                    <div id="tag-history" class="text-sm text-gray-700 space-y-2 flex-grow overflow-y-auto max-h-96 pr-2">
                         <!-- Tag history will be populated here -->
                     </div>
                 </div>
@@ -251,10 +210,10 @@
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     
     <script>
-        /* =============================================================================
-           APPLICATION CONFIGURATION
-           ============================================================================= */
-        
+        // Initialize PDF.js worker immediately
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+        // Configuration
         const CONFIG = {
             LOCAL_STORAGE_KEY: 'pdfTaggerTags',
             SCALE_FACTOR: 1.1,
@@ -265,10 +224,7 @@
             ]
         };
 
-        /* =============================================================================
-           APPLICATION STATE
-           ============================================================================= */
-        
+        // Application State
         const state = {
             pdfDoc: null,
             pdfBytes: null,
@@ -276,23 +232,20 @@
             pageTags: {},
             lastManualTag: null,
             pdfFilename: 'pdf_classifications',
-            
-            // Zoom and Pan state
             currentScale: 1.0,
             isDragging: false,
             lastX: 0,
             lastY: 0,
             translateX: 0,
-            translateY: 0
+            translateY: 0,
+            activeRenderTask: null
         };
 
-        /* =============================================================================
-           DOM ELEMENTS
-           ============================================================================= */
-        
+        // DOM Elements
         const elements = {
             canvas: document.getElementById('pdf-canvas'),
             currentPageDisplay: document.getElementById('current-page-display'),
+            currentPageInput: document.getElementById('current-page-input'),
             totalPagesDisplay: document.getElementById('total-pages-display'),
             currentPageTagDisplay: document.getElementById('current-page-tag'),
             tagHistoryContainer: document.getElementById('tag-history'),
@@ -301,23 +254,19 @@
             tagsFileInput: document.getElementById('tags-file-input'),
             exportButton: document.getElementById('export-button'),
             messageBox: document.getElementById('message-box'),
-            pageJumpInput: document.getElementById('page-jump-input'),
             pdfViewerContainer: document.getElementById('pdf-viewer-container'),
             emptyMessage: document.getElementById('empty-message')
         };
 
         const ctx = elements.canvas.getContext('2d');
 
-        /* =============================================================================
-           UTILITY FUNCTIONS
-           ============================================================================= */
-        
+        // Utility Functions
         function showMessage(message, type = 'error') {
             elements.messageBox.textContent = message;
             elements.messageBox.className = `message-box show ${type === 'error' ? 'bg-red-500' : 'bg-green-500'} text-white`;
             setTimeout(() => {
                 elements.messageBox.classList.remove('show');
-            }, 3000);
+            }, 1000);
         }
 
         function saveTagsToLocalStorage() {
@@ -338,12 +287,26 @@
             }
         }
 
-        /* =============================================================================
-           PDF RENDERING FUNCTIONS
-           ============================================================================= */
-        
+        // PDF Rendering Functions
         async function renderPage(pageNum) {
             if (state.pdfDoc === null) return;
+            
+            // First, cancel any active render task and wait for it to complete
+            if (state.activeRenderTask) {
+                try {
+                    console.log('Cancelling previous render task...');
+                    state.activeRenderTask.cancel();
+                    await state.activeRenderTask.promise.catch(() => {
+                        console.log('Previous render cancelled successfully');
+                    });
+                } catch (e) {
+                    console.log('Render cancellation completed');
+                }
+                state.activeRenderTask = null;
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 10));
+            
             elements.loadingIndicator.style.display = 'block';
 
             try {
@@ -352,55 +315,104 @@
                     return;
                 }
                 
+                console.log(`Starting render for page ${pageNum}`);
+                
                 state.currentPage = pageNum;
                 initializePageTags(state.currentPage);
                 const rotation = state.pageTags[state.currentPage].rotation;
                 const page = await state.pdfDoc.getPage(state.currentPage);
                 
-                // Calculate optimal scale if not zoomed
-                if (state.currentScale === 1.0) {
-                    const viewportAt1 = page.getViewport({ scale: 1, rotation });
-                    const containerWidth = elements.pdfViewerContainer.clientWidth;
-                    const containerHeight = elements.pdfViewerContainer.clientHeight;
-                    const fitScale = Math.min(containerWidth / viewportAt1.width, containerHeight / viewportAt1.height);
+                const naturalViewport = page.getViewport({ scale: 1, rotation });
+                console.log(`Page ${pageNum} natural size: ${naturalViewport.width}x${naturalViewport.height}, rotation: ${rotation}`);
+                
+                const containerWidth = elements.pdfViewerContainer.clientWidth - 20;
+                const containerHeight = elements.pdfViewerContainer.clientHeight - 20;
+                console.log(`Container size: ${containerWidth}x${containerHeight}`);
+                
+                const scaleX = containerWidth / naturalViewport.width;
+                const scaleY = containerHeight / naturalViewport.height;
+                const fitScale = Math.min(scaleX, scaleY, 1.5) * 0.9;
+                
+                console.log(`Calculated scales - X: ${scaleX}, Y: ${scaleY}, fit: ${fitScale}`);
+                
+                const isPageJump = Math.abs(pageNum - (state.previousPage || 1)) > 1;
+                if (isPageJump || state.currentScale === 1.0) {
                     state.currentScale = fitScale;
+                    state.translateX = 0;
+                    state.translateY = 0;
+                    console.log(`Reset scale to: ${state.currentScale}`);
                 }
                 
-                // Render page
-                const viewport = page.getViewport({ scale: state.currentScale, rotation });
-                elements.canvas.width = viewport.width;
-                elements.canvas.height = viewport.height;
-                const renderContext = { canvasContext: ctx, viewport };
-                await page.render(renderContext).promise;
-
-                // Update canvas transform for panning
-                elements.canvas.style.transform = `translate(${state.translateX}px, ${state.translateY}px)`;
+                state.previousPage = pageNum;
                 
-                // Update UI
+                const viewport = page.getViewport({ scale: state.currentScale, rotation });
+                console.log(`Final viewport: ${viewport.width}x${viewport.height} at scale ${state.currentScale}`);
+                
+                const canvas = elements.canvas;
+                
+                canvas.width = 1;
+                canvas.height = 1;
+                
+                const ctx = canvas.getContext('2d');
+                
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                
+                ctx.clearRect(0, 0, viewport.width, viewport.height);
+                
+                console.log(`Canvas reset and sized to: ${canvas.width}x${canvas.height}`);
+                
+                state.activeRenderTask = page.render({
+                    canvasContext: ctx,
+                    viewport: viewport
+                });
+                
+                await state.activeRenderTask.promise;
+                
+                state.activeRenderTask = null;
+                
+                canvas.style.transform = `translate(${state.translateX}px, ${state.translateY}px)`;
+                
                 updatePageDisplay();
+                console.log(`Successfully rendered page ${pageNum}`);
 
             } catch (error) {
-                console.error('Error rendering page:', error);
-                showMessage('Failed to render page. Please try again.');
+                state.activeRenderTask = null;
+                
+                console.error('Render error details:', error);
+                
+                if (error.name === 'RenderingCancelledException' || 
+                    error.message?.includes('cancelled') ||
+                    error.message?.includes('Worker was destroyed')) {
+                    console.log('Render cancelled (expected behavior)');
+                    return;
+                }
+                
+                showMessage(`Failed to render page ${pageNum}: ${error.message}`);
             } finally {
                 elements.loadingIndicator.style.display = 'none';
             }
         }
 
         function updatePageDisplay() {
-            elements.currentPageDisplay.textContent = state.currentPage;
+            console.log('updatePageDisplay called for page:', state.currentPage);
+            console.log('Page tags:', state.pageTags[state.currentPage]?.tags);
+            console.log('Page rotation:', state.pageTags[state.currentPage]?.rotation);
+            
+            elements.currentPageInput.value = state.currentPage;
             const currentTags = state.pageTags[state.currentPage].tags;
             const rotation = state.pageTags[state.currentPage].rotation;
             const rotationTag = rotation === 0 ? '' : ` (Rotated ${rotation}°)`;
-            elements.currentPageTagDisplay.textContent = (currentTags.length > 0)
+            
+            const displayText = (currentTags.length > 0)
                 ? currentTags.join(', ') + rotationTag
                 : 'No tag assigned' + rotationTag;
+                
+            console.log('Setting page display text to:', displayText);
+            elements.currentPageTagDisplay.textContent = displayText;
         }
 
-        /* =============================================================================
-           PDF LOADING FUNCTIONS
-           ============================================================================= */
-        
+        // PDF Loading Functions
         async function loadPDF(source) {
             console.log('Loading PDF...', source instanceof File ? source.name : source);
             
@@ -408,7 +420,6 @@
             elements.emptyMessage.style.display = 'none';
             elements.pdfViewerContainer.classList.remove('no-pdf');
             
-            // Reset state
             state.currentPage = 1;
             state.lastManualTag = null;
             state.pageTags = {};
@@ -418,7 +429,9 @@
             
             elements.tagHistoryContainer.innerHTML = '';
             elements.currentPageTagDisplay.textContent = 'No tag assigned';
+
             localStorage.removeItem(CONFIG.LOCAL_STORAGE_KEY);
+            console.log('Cleared localStorage and reset all state');
 
             try {
                 let pdfData;
@@ -436,6 +449,10 @@
                 console.log('PDF loaded successfully, pages:', state.pdfDoc.numPages);
                 
                 elements.totalPagesDisplay.textContent = state.pdfDoc.numPages;
+                elements.currentPageInput.setAttribute('max', state.pdfDoc.numPages);
+                
+                elements.currentPageDisplay.style.display = 'none';
+                elements.currentPageInput.classList.remove('hidden');
 
                 await renderPage(state.currentPage);
                 console.log('First page rendered');
@@ -445,19 +462,18 @@
                 showMessage('Failed to load PDF: ' + error.message);
                 elements.emptyMessage.style.display = 'block';
                 elements.pdfViewerContainer.classList.add('no-pdf');
+                
+                elements.currentPageInput.classList.add('hidden');
+                elements.currentPageDisplay.style.display = 'inline';
             } finally {
                 elements.loadingIndicator.style.display = 'none';
             }
         }
 
-        /* =============================================================================
-           TAGGING FUNCTIONS
-           ============================================================================= */
-        
+        // Tagging Functions
         function updateTag(tag, isCarrying) {
             initializePageTags(state.currentPage);
             
-            // Handle mutually exclusive content tags
             if (CONFIG.CONTENT_TAGS.includes(tag)) {
                 state.pageTags[state.currentPage].tags = state.pageTags[state.currentPage].tags.filter(
                     existingTag => !CONFIG.CONTENT_TAGS.includes(existingTag)
@@ -468,11 +484,10 @@
                 state.pageTags[state.currentPage].tags.push(tag);
             }
             
-            // Handle auto-tagging
             if (isCarrying) {
                 state.lastManualTag = tag;
             } else {
-                if (tag !== 'redundant') {
+                if (tag !== 'delete') {
                     state.lastManualTag = null;
                 }
             }
@@ -483,26 +498,39 @@
         }
 
         function updateTagHistory() {
+            console.log('updateTagHistory called');
+            console.log('Current pageTags state:', state.pageTags);
+            
             elements.tagHistoryContainer.innerHTML = '';
-            const historyLimit = 10;
-            const pages = Object.keys(state.pageTags).map(Number).sort((a, b) => b - a);
-            const historyPages = pages.slice(0, historyLimit);
+            
+            // Get all pages that have been initialized (tagged or at least visited)
+            // Sort in descending order (highest page numbers first)
+            const allPages = Object.keys(state.pageTags).map(Number).sort((a, b) => b - a);
 
-            historyPages.forEach(page => {
+            console.log('History pages order:', allPages);
+
+            allPages.forEach(page => {
                 const tags = state.pageTags[page].tags;
                 const rotation = state.pageTags[page].rotation;
                 const rotationText = rotation === 0 ? '' : ` (Rotated ${rotation}°)`;
+                
+                let displayText = '';
+                if (tags.length === 0) {
+                    displayText = '';
+                } else {
+                    displayText = tags.join(', ');
+                }
+                
+                console.log(`Page ${page} history display:`, displayText);
+                
                 const historyItem = document.createElement('div');
                 historyItem.className = 'flex justify-between items-center bg-gray-100 p-2 rounded-lg';
-                historyItem.innerHTML = `<span class="font-semibold text-gray-700">Page ${page}:</span> <span class="text-blue-600 font-medium">${tags.join(', ')}${rotationText}</span>`;
+                historyItem.innerHTML = `<span class="text-xs font-medium text-gray-600">Page ${page}:</span> <span class="text-xs text-blue-600 font-medium truncate ml-2">${displayText}${rotationText}</span>`;
                 elements.tagHistoryContainer.appendChild(historyItem);
             });
         }
 
-        /* =============================================================================
-           EXPORT FUNCTIONS
-           ============================================================================= */
-        
+        // Export Functions
         async function exportRotatedAndCleanPdf() {
             if (!state.pdfBytes) {
                 showMessage('No PDF loaded to export.');
@@ -522,8 +550,7 @@
                     const pageNum = i + 1;
                     initializePageTags(pageNum);
 
-                    // Skip redundant pages
-                    if (state.pageTags[pageNum].tags.includes('redundant')) {
+                    if (state.pageTags[pageNum].tags.includes('delete')) {
                         continue;
                     }
 
@@ -541,12 +568,12 @@
                 const blob = new Blob([modifiedPdfBytes], { type: 'application/pdf' });
                 const url = URL.createObjectURL(blob);
                 
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${state.pdfFilename}_clean.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
+                const pdfAnchor = document.createElement('a');
+                pdfAnchor.href = url;
+                pdfAnchor.download = `${state.pdfFilename}_clean.pdf`;
+                document.body.appendChild(pdfAnchor);
+                pdfAnchor.click();
+                document.body.removeChild(pdfAnchor);
                 
             } catch (error) {
                 console.error('Error exporting PDF:', error);
@@ -565,7 +592,7 @@
             
             for (let i = 1; i <= state.pdfDoc.numPages; i++) {
                 const pageData = state.pageTags[i];
-                if (pageData && !pageData.tags.includes('redundant')) {
+                if (pageData && !pageData.tags.includes('delete')) {
                     cleanTags[newPageNumber] = {
                         tags: [...pageData.tags],
                         rotation: pageData.rotation
@@ -602,10 +629,6 @@
             }
         }
 
-        /* =============================================================================
-           EVENT HANDLERS
-           ============================================================================= */
-        
         function handleKeydown(e) {
             if (state.pdfDoc === null) return;
 
@@ -620,29 +643,51 @@
                     break;
                     
                 case 'arrowright':
+                    console.log('Arrow right pressed, currentPage:', state.currentPage, 'lastManualTag:', state.lastManualTag);
                     if (state.currentPage < state.pdfDoc.numPages) {
                         state.currentPage++;
-                        // Auto-tag if page is empty
+                        console.log('Moved to page:', state.currentPage);
                         if (state.lastManualTag && (!state.pageTags[state.currentPage] || state.pageTags[state.currentPage].tags.length === 0)) {
+                            console.log('Auto-applying tag:', state.lastManualTag, 'to page:', state.currentPage);
                             initializePageTags(state.currentPage);
                             state.pageTags[state.currentPage].tags.push(state.lastManualTag);
                             saveTagsToLocalStorage();
+                            updateTagHistory();
+                        } else {
+                            console.log('Not auto-tagging because:');
+                            console.log('  - lastManualTag:', state.lastManualTag);
+                            console.log('  - existing tags on page:', state.pageTags[state.currentPage]?.tags || 'none');
                         }
                         renderPage(state.currentPage);
                     }
                     break;
                     
-                case '1': updateTag('hebrew printed', true); break;
-                case '2': updateTag('hebrew paper clippings', true); break;
-                case '3': updateTag('hebrew handwritten', true); break;
-                case '4': updateTag('non-hebrew printed', true); break;
-                case '5': updateTag('non-hebrew paper clippings', true); break;
-                case '6': updateTag('image', true); break;
-                case '7': updateTag('undefined', true); break;
-                case '8': updateTag('mixed', true); break;
+                case 'h': 
+                    updateTag('hebrew printed', true); 
+                    break;
+                case 'p': 
+                    updateTag('hebrew paper clippings', true); 
+                    break;
+                case 'w': 
+                    updateTag('hebrew handwritten', true); 
+                    break;
+                case 'f': 
+                    updateTag('non-hebrew printed', true); 
+                    break;
+                case 'g': 
+                    updateTag('non-hebrew paper clippings', true); 
+                    break;
+                case 'i': 
+                    updateTag('image', true); 
+                    break;
+                case 'u': 
+                    updateTag('undefined', true); 
+                    break;
+                case 'm': 
+                    updateTag('mixed', true); 
+                    break;
                 
                 case 'n':
-                    // New document starts
                     initializePageTags(state.currentPage);
                     state.pageTags[state.currentPage].tags = ['new document starts', 'hebrew printed'];
                     state.lastManualTag = 'hebrew printed';
@@ -650,44 +695,40 @@
                     updateTagHistory();
                     renderPage(state.currentPage);
                     break;
-                    
-                case 'r':
-                    // Redundant page
+
+                case 'delete':
+                case 'backspace':
                     initializePageTags(state.currentPage);
-                    state.pageTags[state.currentPage].tags = ['redundant'];
-                    state.lastManualTag = null;
+                    state.pageTags[state.currentPage].tags = ['delete'];
                     saveTagsToLocalStorage();
                     updateTagHistory();
                     renderPage(state.currentPage);
+                    showMessage('Page ' + state.currentPage +' marked for deletion.', 'success');
                     break;
                     
                 case 't':
-                    // Rotate page
                     initializePageTags(state.currentPage);
                     state.pageTags[state.currentPage].rotation = (state.pageTags[state.currentPage].rotation + 90) % 360;
                     saveTagsToLocalStorage();
                     updateTagHistory();
                     renderPage(state.currentPage);
-                    showMessage('Page rotated 90 degrees.', 'success');
                     break;
                     
                 case 'c':
-                    // Clear tags
                     state.pageTags[state.currentPage].tags = [];
                     state.lastManualTag = null;
                     saveTagsToLocalStorage();
+                    updateTagHistory();
                     renderPage(state.currentPage);
-                    showMessage('Tags cleared from this page.', 'success');
+                    showMessage('Tags cleared', 'success');
                     break;
                     
                 case 'l':
-                    // Continue previous document
                     if (state.currentPage > 1 && state.pageTags[state.currentPage]) {
                         const newDocTagIndex = state.pageTags[state.currentPage].tags.indexOf('new document starts');
                         if (newDocTagIndex !== -1) {
                             state.pageTags[state.currentPage].tags.splice(newDocTagIndex, 1);
                         }
-                        // Set auto-tagging to the last tag of the previous page
                         const prevPageTags = state.pageTags[state.currentPage - 1];
                         if (prevPageTags && prevPageTags.tags.length > 0) {
                             state.lastManualTag = prevPageTags.tags[prevPageTags.tags.length - 1];
@@ -701,16 +742,39 @@
                         showMessage('Cannot continue previous document. No tags on previous page or this is the first page.', 'error');
                     }
                     break;
+                    
+                case 'z':
+                    // Reset zoom and pan
+                    const containerWidth = elements.pdfViewerContainer.clientWidth - 20;
+                    const containerHeight = elements.pdfViewerContainer.clientHeight - 20;
+                    if (state.pdfDoc && state.currentPage >= 1 && state.currentPage <= state.pdfDoc.numPages) {
+                        // Recalculate the fit scale
+                        initializePageTags(state.currentPage);
+                        const rotation = state.pageTags[state.currentPage].rotation;
+                        state.pdfDoc.getPage(state.currentPage).then(page => {
+                            const naturalViewport = page.getViewport({ scale: 1, rotation });
+                            const scaleX = containerWidth / naturalViewport.width;
+                            const scaleY = containerHeight / naturalViewport.height;
+                            const fitScale = Math.min(scaleX, scaleY, 1.5) * 0.9;
+                            
+                            state.currentScale = fitScale;
+                            state.translateX = 0;
+                            state.translateY = 0;
+                            renderPage(state.currentPage);
+                            showMessage('Zoom and pan reset to fit page.', 'success');
+                        });
+                    }
+                    break;
             }
         }
 
-        function handlePageJump(e) {
-            if (e.key === 'Enter') {
-                const pageNum = parseInt(elements.pageJumpInput.value, 10);
+        function handlePageInput(e) {
+            if (e.key === 'Enter' || e.type === 'change') {
+                const pageNum = parseInt(elements.currentPageInput.value, 10);
                 if (state.pdfDoc && pageNum >= 1 && pageNum <= state.pdfDoc.numPages) {
                     renderPage(pageNum);
-                    elements.pageJumpInput.value = '';
                 } else {
+                    elements.currentPageInput.value = state.currentPage;
                     showMessage('Please enter a valid page number.', 'error');
                 }
             }
@@ -732,15 +796,18 @@
                 reader.onload = function(e) {
                     try {
                         const loadedTags = JSON.parse(e.target.result);
-                        // Convert old format to new format if necessary
+                        
                         for (const page in loadedTags) {
                             if (Array.isArray(loadedTags[page])) {
+                                // Convert old format to new format
                                 loadedTags[page] = { tags: loadedTags[page], rotation: 0 };
                             } else if (typeof loadedTags[page] !== 'object' || !Array.isArray(loadedTags[page].tags)) {
                                 console.warn('Invalid page data format, skipping:', loadedTags[page]);
                                 delete loadedTags[page];
+                                continue;
                             }
                         }
+                        
                         state.pageTags = loadedTags;
                         updateTagHistory();
                         renderPage(state.currentPage);
@@ -754,10 +821,7 @@
             }
         }
 
-        /* =============================================================================
-           CANVAS INTERACTION HANDLERS
-           ============================================================================= */
-        
+        // Canvas Interaction Handlers
         function handleMouseDown(e) {
             e.preventDefault();
             if (!state.pdfDoc) return;
@@ -773,6 +837,13 @@
             const dy = e.clientY - state.lastY;
             state.translateX += dx;
             state.translateY += dy;
+            
+            // Clamp translation to prevent dragging too far away
+            const containerRect = elements.pdfViewerContainer.getBoundingClientRect();
+            const maxTranslate = Math.max(containerRect.width, containerRect.height);
+            state.translateX = Math.max(-maxTranslate, Math.min(maxTranslate, state.translateX));
+            state.translateY = Math.max(-maxTranslate, Math.min(maxTranslate, state.translateY));
+            
             elements.canvas.style.transform = `translate(${state.translateX}px, ${state.translateY}px)`;
             state.lastX = e.clientX;
             state.lastY = e.clientY;
@@ -788,47 +859,45 @@
             if (!state.pdfDoc) return;
             
             const oldScale = state.currentScale;
-            state.currentScale = e.deltaY > 0 ? oldScale / CONFIG.SCALE_FACTOR : oldScale * CONFIG.SCALE_FACTOR;
+            const zoomFactor = e.deltaY > 0 ? 1 / CONFIG.SCALE_FACTOR : CONFIG.SCALE_FACTOR;
+            const newScale = oldScale * zoomFactor;
+            
+            // Ensure scale stays within reasonable bounds
+            state.currentScale = Math.max(0.1, Math.min(5.0, newScale));
+            
+            // If scale didn't change (at limits), don't do anything
+            if (state.currentScale === oldScale) {
+                return;
+            }
 
-            // Constrain scale
-            state.currentScale = Math.max(0.1, Math.min(10.0, state.currentScale));
+            // Get mouse position relative to the viewport container, not the canvas
+            const containerRect = elements.pdfViewerContainer.getBoundingClientRect();
+            const mouseX = e.clientX - containerRect.left;
+            const mouseY = e.clientY - containerRect.top;
 
-            // Calculate new position to zoom around mouse cursor
-            const rect = elements.canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
+            const scaleFactor = state.currentScale / oldScale;
 
-            const oldWidth = elements.canvas.width;
-            const oldHeight = elements.canvas.height;
-
-            const newWidth = oldWidth * (state.currentScale / oldScale);
-            const newHeight = oldHeight * (state.currentScale / oldScale);
-
-            state.translateX -= (mouseX / oldWidth) * (newWidth - oldWidth);
-            state.translateY -= (mouseY / oldHeight) * (newHeight - oldHeight);
+            // Adjust translation to zoom towards mouse position
+            state.translateX = mouseX - scaleFactor * (mouseX - state.translateX);
+            state.translateY = mouseY - scaleFactor * (mouseY - state.translateY);
+            
+            // Clamp translation to prevent the canvas from being dragged too far away
+            const maxTranslate = Math.max(containerRect.width, containerRect.height);
+            state.translateX = Math.max(-maxTranslate, Math.min(maxTranslate, state.translateX));
+            state.translateY = Math.max(-maxTranslate, Math.min(maxTranslate, state.translateY));
             
             renderPage(state.currentPage);
         }
 
-        /* =============================================================================
-           EVENT LISTENER REGISTRATION
-           ============================================================================= */
-        
+        // Event Listener Registration
         function initializeEventListeners() {
-            // Keyboard events
             document.addEventListener('keydown', handleKeydown);
-            
-            // Page jump
-            elements.pageJumpInput.addEventListener('keydown', handlePageJump);
-            
-            // File inputs
+            elements.currentPageInput.addEventListener('keydown', handlePageInput);
+            elements.currentPageInput.addEventListener('change', handlePageInput);
             elements.pdfFileInput.addEventListener('change', handleFileLoad);
             elements.tagsFileInput.addEventListener('change', handleTagsLoad);
-            
-            // Export button
             elements.exportButton.addEventListener('click', handleCombinedExport);
             
-            // Canvas interactions
             elements.canvas.addEventListener('mousedown', handleMouseDown);
             elements.canvas.addEventListener('mousemove', handleMouseMove);
             elements.canvas.addEventListener('mouseup', handleMouseUp);
@@ -836,39 +905,17 @@
             elements.canvas.addEventListener('wheel', handleWheel);
         }
 
-        /* =============================================================================
-           APPLICATION INITIALIZATION
-           ============================================================================= */
-        
+        // Application Initialization
         function initializeApp() {
-            // Ensure PDF.js is loaded
-            if (typeof pdfjsLib === 'undefined') {
-                console.error('PDF.js library not loaded');
-                showMessage('PDF.js library failed to load. Please refresh the page.', 'error');
-                return;
-            }
-            
-            // Set up PDF.js worker
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-            
             initializeEventListeners();
             console.log('PDF Document Classifier initialized successfully');
         }
 
-        // Start the application when libraries are loaded
-        function waitForLibraries() {
-            if (typeof pdfjsLib !== 'undefined' && typeof PDFLib !== 'undefined') {
-                initializeApp();
-            } else {
-                // Wait a bit more for libraries to load
-                setTimeout(waitForLibraries, 100);
-            }
-        }
-
+        // Initialize when DOM is ready
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', waitForLibraries);
+            document.addEventListener('DOMContentLoaded', initializeApp);
         } else {
-            waitForLibraries();
+            initializeApp();
         }
     </script>
 </body>
